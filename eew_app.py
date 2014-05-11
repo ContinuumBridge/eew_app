@@ -33,8 +33,8 @@ from cbconfig import *
 
 class DataManager:
     """ Managers data storage for all sensors """
-    def __init__(self, cbSendMsg):
-        self.cbSendMsg = cbSendMsg
+    def __init__(self, sendMessage):
+        self.sendMessage = sendMessage
         self.now = self.niceTime(time.time())
         self.cvsList = []
         self.cvsLine = []
@@ -101,7 +101,7 @@ class DataManager:
                         "data": a
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
     def storeTemp(self, deviceID, timeStamp, temp):
         self.writeCVS(timeStamp)
@@ -120,7 +120,7 @@ class DataManager:
                         "data": temp
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
     def storeIrTemp(self, deviceID, timeStamp, temp):
         self.writeCVS(timeStamp)
@@ -139,7 +139,7 @@ class DataManager:
                         "data": temp
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
     def storeHumidity(self, deviceID, timeStamp, h):
         self.writeCVS(timeStamp)
@@ -158,7 +158,7 @@ class DataManager:
                         "data": h
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
 
     def storeButtons(self, deviceID, timeStamp, buttons):
@@ -179,7 +179,7 @@ class DataManager:
                         "data": [buttons["leftButton"], buttons["rightButton"]]
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
     def storeGyro(self, deviceID, timeStamp, gyro):
         req = {
@@ -195,7 +195,7 @@ class DataManager:
                         "data": gyro
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
     def storeMagnet(self, deviceID, timeStamp, magnet):
         req = {
@@ -211,7 +211,7 @@ class DataManager:
                         "data": magnet
                        }
               }
-        self.cbSendMsg(req, "conc")
+        self.sendMessage(req, "conc")
 
 class Accelerometer:
     def __init__(self, id):
@@ -339,11 +339,6 @@ class Humid():
 class App(CbApp):
     def __init__(self, argv):
         logging.basicConfig(filename=CB_LOGFILE,level=CB_LOGGING_LEVEL,format='%(asctime)s %(message)s')
-        # The following 3 declarations must be made
-        CbApp.processAdaptor = self.processAdaptor
-        CbApp.appConfigure = self.configure
-        CbApp.processConcentrator = self.processConcentrator
-        #
         self.appClass = "monitor"
         self.state = "stopped"
         self.status = "ok"
@@ -357,11 +352,11 @@ class App(CbApp):
         self.devices = []
         self.devServices = [] 
         self.idToName = {} 
-        self.dm = DataManager(self.cbSendMsg)
+        self.dm = DataManager(self.sendMessage)
         #CbApp.__init__ MUST be called
         CbApp.__init__(self, argv)
 
-    def states(self, action):
+    def setState(self, action):
         if action == "clear_error":
             self.state = "running"
         else:
@@ -369,9 +364,9 @@ class App(CbApp):
         msg = {"id": self.id,
                "status": "state",
                "state": self.state}
-        self.cbSendManagerMsg(msg)
+        self.sendManagerMessage(msg)
 
-    def processConcentrator(self, resp):
+    def onConcMessage(self, resp):
         #logging.debug("%s resp from conc: %s", ModuleName, resp)
         if resp["resp"] == "config":
             msg = {
@@ -385,111 +380,107 @@ class App(CbApp):
                         "services": self.devServices
                        }
                   }
-            self.cbSendMsg(msg, "conc")
+            self.sendMessage(msg, "conc")
         else:
             msg = {"appID": self.id,
                    "msg": "error",
                    "message": "unrecognised response from concentrator"}
-            self.cbSendMsg(msg, "conc")
+            self.sendMessage(msg, "conc")
 
-    def processAdaptor(self, resp):
+    def onAdaptorData(self, message):
         """
         This method is called in a thread by cbcommslib so it will not cause
         problems if it takes some time to complete (other than to itself).
         """
-        #logging.debug("%s resp: %s", ModuleName, resp)
-        if resp["content"] == "acceleration":
+        #logging.debug("%s onadaptorData, message: %s", ModuleName, message)
+        if message["content"] == "acceleration":
             for a in self.accel:
-                if a.id == resp["id"]: 
-                    a.processAccel(resp)
+                if a.id == message["id"]: 
+                    a.processAccel(message)
                     break
-        elif resp["content"] == "temperature":
+        elif message["content"] == "temperature":
             for t in self.temp:
-                if t.id == resp["id"]:
-                    t.processTemp(resp)
+                if t.id == message["id"]:
+                    t.processTemp(message)
                     break
-        elif resp["content"] == "ir_temperature":
+        elif message["content"] == "ir_temperature":
             for t in self.irTemp:
-                if t.id == resp["id"]:
-                    t.processIrTemp(resp)
+                if t.id == message["id"]:
+                    t.processIrTemp(message)
                     break
-        elif resp["content"] == "gyro":
+        elif message["content"] == "gyro":
             for g in self.gyro:
-                if g.id == resp["id"]:
-                    g.processGyro(resp)
+                if g.id == message["id"]:
+                    g.processGyro(message)
                     break
-        elif resp["content"] == "magnetometer":
+        elif message["content"] == "magnetometer":
             for g in self.magnet:
-                if g.id == resp["id"]:
-                    g.processMagnet(resp)
+                if g.id == message["id"]:
+                    g.processMagnet(message)
                     break
-        elif resp["content"] == "buttons":
+        elif message["content"] == "buttons":
             for b in self.buttons:
-                if b.id == resp["id"]:
-                    b.processButtons(resp)
+                if b.id == message["id"]:
+                    b.processButtons(message)
                     break
-        elif resp["content"] == "rel_humidity":
+        elif message["content"] == "rel_humidity":
             for b in self.humidity:
-                if b.id == resp["id"]:
-                    b.processHumidity(resp)
+                if b.id == message["id"]:
+                    b.processHumidity(message)
                     break
-        elif resp["content"] == "services":
-            self.devServices.append(resp)
-            serviceReq = []
-            for p in resp["services"]:
-                # Based on services offered & whether we want to enable them
-                if p["parameter"] == "temperature":
-                    if TEMP:
-                        self.temp.append(TemperatureMeasure(resp["id"]))
-                        self.temp[-1].dm = self.dm
-                        serviceReq.append("temperature")
-                elif p["parameter"] == "ir_temperature":
-                    if IRTEMP:
-                        self.irTemp.append(IrTemperatureMeasure(resp["id"]))
-                        self.irTemp[-1].dm = self.dm
-                        serviceReq.append("ir_temperature")
-                elif p["parameter"] == "acceleration":
-                    if ACCEL:
-                        self.accel.append(Accelerometer(resp["id"]))
-                        serviceReq.append("acceleration")
-                        self.accel[-1].dm = self.dm
-                elif p["parameter"] == "gyro":
-                    if GYRO:
-                        self.gyro.append(Gyro(resp["id"]))
-                        self.gyro[-1].dm = self.dm
-                        serviceReq.append("gyro")
-                elif p["parameter"] == "magnetometer":
-                    if MAGNET: 
-                        self.magnet.append(Magnet(resp["id"]))
-                        self.magnet[-1].dm = self.dm
-                        serviceReq.append("magnetometer")
-                elif p["parameter"] == "buttons":
-                    if BUTTONS:
-                        self.buttons.append(Buttons(resp["id"]))
-                        self.buttons[-1].dm = self.dm
-                        serviceReq.append("buttons")
-                elif p["parameter"] == "rel_humidity":
-                    if HUMIDITY:
-                        self.humidity.append(Humid(resp["id"]))
-                        self.humidity[-1].dm = self.dm
-                        serviceReq.append("rel_humidity")
-            msg = {"id": self.id,
-                   "req": "services",
-                   "services": serviceReq}
-            self.cbSendMsg(msg, resp["id"])
-            self.states("running")
-        elif resp["content"] == "none":
-            pass
-        else:
-            # A problem has occured. Report it to bridge manager
-            #self.status = "adaptor problem"
-            pass
 
-    def configure(self, config):
+    def onAdaptorFunctions(self, message):
+        #logging.debug("%s onAdaptorFunctions, message: %s", ModuleName, message)
+        self.devServices.append(message)
+        serviceReq = []
+        for p in message["functions"]:
+            # Based on services offered & whether we want to enable them
+            if p["parameter"] == "temperature":
+                if TEMP:
+                    self.temp.append(TemperatureMeasure(message["id"]))
+                    self.temp[-1].dm = self.dm
+                    serviceReq.append("temperature")
+            elif p["parameter"] == "ir_temperature":
+                if IRTEMP:
+                    self.irTemp.append(IrTemperatureMeasure(message["id"]))
+                    self.irTemp[-1].dm = self.dm
+                    serviceReq.append("ir_temperature")
+            elif p["parameter"] == "acceleration":
+                if ACCEL:
+                    self.accel.append(Accelerometer(message["id"]))
+                    serviceReq.append("acceleration")
+                    self.accel[-1].dm = self.dm
+            elif p["parameter"] == "gyro":
+                if GYRO:
+                    self.gyro.append(Gyro(message["id"]))
+                    self.gyro[-1].dm = self.dm
+                    serviceReq.append("gyro")
+            elif p["parameter"] == "magnetometer":
+                if MAGNET: 
+                    self.magnet.append(Magnet(message["id"]))
+                    self.magnet[-1].dm = self.dm
+                    serviceReq.append("magnetometer")
+            elif p["parameter"] == "buttons":
+                if BUTTONS:
+                    self.buttons.append(Buttons(message["id"]))
+                    self.buttons[-1].dm = self.dm
+                    serviceReq.append("buttons")
+            elif p["parameter"] == "rel_humidity":
+                if HUMIDITY:
+                    self.humidity.append(Humid(message["id"]))
+                    self.humidity[-1].dm = self.dm
+                    serviceReq.append("rel_humidity")
+        msg = {"id": self.id,
+               "request": "functions",
+               "functions": serviceReq}
+        self.sendMessage(msg, message["id"])
+        self.setState("running")
+
+    def onConfigureMessage(self, config):
         """ Config is based on what sensors are available """
         self.dm.appID = self.id
         self.dm.appNum = int(self.id[3:])
-        for adaptor in config["adts"]:
+        for adaptor in config["adaptors"]:
             adtID = adaptor["id"]
             if adtID not in self.devices:
                 # Because configure may be re-called if devices are added
@@ -499,7 +490,7 @@ class App(CbApp):
                 self.idToName[adtID] = friendly_name
                 self.devices.append(adtID)
         self.dm.initFile(self.idToName)
-        self.states("starting")
+        self.setState("starting")
 
 if __name__ == '__main__':
 
