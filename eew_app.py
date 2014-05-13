@@ -59,7 +59,7 @@ class DataManager:
     def initFile(self, idToName):
         self.idToName = idToName
         for i in self.idToName:
-            self.index.append(i)
+            self.index.append(self.idToName[i])
         services = ["temperature", 
                     "ir_temperature", 
                     "accel x", "accel y", "accel z",
@@ -395,37 +395,37 @@ class App(CbApp):
         #logging.debug("%s onadaptorData, message: %s", ModuleName, message)
         if message["content"] == "acceleration":
             for a in self.accel:
-                if a.id == message["id"]: 
+                if a.id == self.idToName[message["id"]]: 
                     a.processAccel(message)
                     break
         elif message["content"] == "temperature":
             for t in self.temp:
-                if t.id == message["id"]:
+                if t.id == self.idToName[message["id"]]:
                     t.processTemp(message)
                     break
         elif message["content"] == "ir_temperature":
             for t in self.irTemp:
-                if t.id == message["id"]:
+                if t.id == self.idToName[message["id"]]:
                     t.processIrTemp(message)
                     break
         elif message["content"] == "gyro":
             for g in self.gyro:
-                if g.id == message["id"]:
+                if g.id == self.idToName[message["id"]]:
                     g.processGyro(message)
                     break
         elif message["content"] == "magnetometer":
             for g in self.magnet:
-                if g.id == message["id"]:
+                if g.id == self.idToName[message["id"]]:
                     g.processMagnet(message)
                     break
         elif message["content"] == "buttons":
             for b in self.buttons:
-                if b.id == message["id"]:
+                if b.id == self.idToName[message["id"]]:
                     b.processButtons(message)
                     break
         elif message["content"] == "rel_humidity":
             for b in self.humidity:
-                if b.id == message["id"]:
+                if b.id == self.idToName[message["id"]]:
                     b.processHumidity(message)
                     break
 
@@ -437,37 +437,37 @@ class App(CbApp):
             # Based on services offered & whether we want to enable them
             if p["parameter"] == "temperature":
                 if TEMP:
-                    self.temp.append(TemperatureMeasure(message["id"]))
+                    self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
                     serviceReq.append("temperature")
             elif p["parameter"] == "ir_temperature":
                 if IRTEMP:
-                    self.irTemp.append(IrTemperatureMeasure(message["id"]))
+                    self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
                     serviceReq.append("ir_temperature")
             elif p["parameter"] == "acceleration":
                 if ACCEL:
-                    self.accel.append(Accelerometer(message["id"]))
+                    self.accel.append(Accelerometer(self.idToName(message["id"])))
                     serviceReq.append("acceleration")
                     self.accel[-1].dm = self.dm
             elif p["parameter"] == "gyro":
                 if GYRO:
-                    self.gyro.append(Gyro(message["id"]))
+                    self.gyro.append(Gyro(self.idToName[message["id"]]))
                     self.gyro[-1].dm = self.dm
                     serviceReq.append("gyro")
             elif p["parameter"] == "magnetometer":
                 if MAGNET: 
-                    self.magnet.append(Magnet(message["id"]))
+                    self.magnet.append(Magnet(self.idToName[message["id"]]))
                     self.magnet[-1].dm = self.dm
                     serviceReq.append("magnetometer")
             elif p["parameter"] == "buttons":
                 if BUTTONS:
-                    self.buttons.append(Buttons(message["id"]))
+                    self.buttons.append(Buttons(self.idToName[message["id"]]))
                     self.buttons[-1].dm = self.dm
                     serviceReq.append("buttons")
             elif p["parameter"] == "rel_humidity":
                 if HUMIDITY:
-                    self.humidity.append(Humid(message["id"]))
+                    self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
                     serviceReq.append("rel_humidity")
         msg = {"id": self.id,
@@ -487,7 +487,7 @@ class App(CbApp):
                 name = adaptor["name"]
                 friendly_name = adaptor["friendly_name"]
                 logging.debug("%s Configure app. Adaptor name: %s", ModuleName, name)
-                self.idToName[adtID] = friendly_name
+                self.idToName[adtID] = friendly_name.replace(" ", "_")
                 self.devices.append(adtID)
         self.dm.initFile(self.idToName)
         self.setState("starting")
