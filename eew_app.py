@@ -9,12 +9,12 @@ ModuleName = "eew_app"
 
 # Enable required sensors
 TEMP = True
-IRTEMP = True
+IRTEMP = False
 ACCEL = False
 HUMIDITY = True
 GYRO = False
 MAGNET = False
-BUTTONS = True
+BUTTONS = False
 
 # Mininum change in parameters before it is reported
 TEMP_MIN_CHANGE = 0.2
@@ -439,16 +439,19 @@ class App(CbApp):
                 if TEMP:
                     self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
-                    serviceReq.append("temperature")
+                    serviceReq.append({"parameter": "temperature",
+                                       "interval": 30})
             elif p["parameter"] == "ir_temperature":
                 if IRTEMP:
                     self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
-                    serviceReq.append("ir_temperature")
+                    serviceReq.append({"parameter": "ir_temperature",
+                                       "interval": 30})
             elif p["parameter"] == "acceleration":
                 if ACCEL:
                     self.accel.append(Accelerometer(self.idToName(message["id"])))
-                    serviceReq.append("acceleration")
+                    serviceReq.append({"parameter": "acceleration",
+                                      "intervale": 0.3})
                     self.accel[-1].dm = self.dm
             elif p["parameter"] == "gyro":
                 if GYRO:
@@ -464,12 +467,14 @@ class App(CbApp):
                 if BUTTONS:
                     self.buttons.append(Buttons(self.idToName[message["id"]]))
                     self.buttons[-1].dm = self.dm
-                    serviceReq.append("buttons")
+                    serviceReq.append({"parameter": "buttons",
+                                      "interval": 0})
             elif p["parameter"] == "rel_humidity":
                 if HUMIDITY:
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
-                    serviceReq.append("rel_humidity")
+                    serviceReq.append({"parameter": "rel_humidity",
+                                      "interval": 30})
         msg = {"id": self.id,
                "request": "functions",
                "functions": serviceReq}
