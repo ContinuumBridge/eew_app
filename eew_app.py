@@ -8,21 +8,23 @@
 ModuleName = "eew_app" 
 
 # Enable required sensors
-TEMP = True
-IRTEMP = False
-ACCEL = False
-HUMIDITY = True
-GYRO = False
-MAGNET = False
-BUTTONS = False
+TEMP                    = True
+IRTEMP                  = False
+ACCEL                   = False
+HUMIDITY                = True
+GYRO                    = False
+MAGNET                  = False
+BUTTONS                 = True
+
+SENSOR_POLLING_INTERVAL = 30.0
 
 # Mininum change in parameters before it is reported
-TEMP_MIN_CHANGE = 0.2
-IRTEMP_MIN_CHANGE = 0.5
-HUMIDITY_MIN_CHANGE = 0.5
-ACCEL_MIN_CHANGE = 0.02
-GYRO_MIN_CHANGE = 0.5
-MAGNET_MIN_CHANGE = 0.5
+TEMP_MIN_CHANGE         = 0.2
+IRTEMP_MIN_CHANGE       = 0.5
+HUMIDITY_MIN_CHANGE     = 0.5
+ACCEL_MIN_CHANGE        = 0.02
+GYRO_MIN_CHANGE         = 0.5
+MAGNET_MIN_CHANGE       = 0.5
 
 import sys
 import os.path
@@ -440,13 +442,13 @@ class App(CbApp):
                     self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
                     serviceReq.append({"parameter": "temperature",
-                                       "interval": 30})
+                                       "interval": SENSOR_POLLING_INTERVAL})
             elif p["parameter"] == "ir_temperature":
                 if IRTEMP:
                     self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
                     serviceReq.append({"parameter": "ir_temperature",
-                                       "interval": 30})
+                                       "interval": SENSOR_POLLING_INTERVAL})
             elif p["parameter"] == "acceleration":
                 if ACCEL:
                     self.accel.append(Accelerometer(self.idToName(message["id"])))
@@ -474,7 +476,7 @@ class App(CbApp):
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
                     serviceReq.append({"parameter": "rel_humidity",
-                                      "interval": 30})
+                                      "interval": SENSOR_POLLING_INTERVAL})
         msg = {"id": self.id,
                "request": "functions",
                "functions": serviceReq}
