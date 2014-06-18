@@ -7,31 +7,29 @@
 #
 ModuleName = "eew_app" 
 
-# Enable required sensors
-TEMP                    = True
-IRTEMP                  = False
-ACCEL                   = False
-HUMIDITY                = True
-GYRO                    = False
-MAGNET                  = False
-BUTTONS                 = True
-
-SENSOR_POLLING_INTERVAL = 30.0
-
-# Mininum change in parameters before it is reported
-TEMP_MIN_CHANGE         = 0.2
-IRTEMP_MIN_CHANGE       = 0.5
-HUMIDITY_MIN_CHANGE     = 0.5
-ACCEL_MIN_CHANGE        = 0.02
-GYRO_MIN_CHANGE         = 0.5
-MAGNET_MIN_CHANGE       = 0.5
-
 import sys
 import os.path
 import time
 import logging
 from cbcommslib import CbApp
 from cbconfig import *
+
+# Sensor enables and min changes that will register. Can be overridden in environment
+TEMP                     = str2bool(os.getenv('EEW_TEMP', 'True'))
+IRTEMP                   = str2bool(os.getenv('EEW_IRTEMP', 'False'))
+ACCEL                    = str2bool(os.getenv('EEW_ACCEL', 'False'))
+HUMIDITY                 = str2bool(os.getenv('EEW_HUMIDITY', 'False'))
+GYRO                     = str2bool(os.getenv('EEW_GYRO', 'False'))
+MAGNET                   = str2bool(os.getenv('EEW_MAGNET', 'False'))
+BUTTONS                  = str2bool(os.getenv('EEW_BUTTONS', 'False'))
+TEMP_MIN_CHANGE          = float(os.getenv('EEW_TEMP_MIN_CHANGE', '0.2'))
+IRTEMP_MIN_CHANGE        = float(os.getenv('EEW_IRTEMP_MIN_CHANGE', '0.5'))
+HUMIDITY_MIN_CHANGE      = float(os.getenv('EEW_HUMIDITY_MIN_CHANGE', '0.5'))
+ACCEL_MIN_CHANGE         = float(os.getenv('EEW__ACCEL_MIN_CHANGE', '0.02'))
+GYRO_MIN_CHANGE          = float(os.getenv('EEW_GYRO_MIN_CHANGE', '0.5'))
+MAGNET_MIN_CHANGE        = float(os.getenv('EEW_MAGNET_MIN_CHANGE', '1.0'))
+SENSOR_POLLING_INTERVAL  = float(os.getenv('EEW_SENSOR_POLLING_INTERVAL', '30.0'))
+
 
 class DataManager:
     """ Managers data storage for all sensors """
@@ -67,7 +65,7 @@ class DataManager:
                     "accel x", "accel y", "accel z",
                     "buttons l", "buttons r",
                     "rel humidily",
-                    "pressure"]
+                    "gyro x", "gyro y", "gyro z"]
         self.numberServices = len(services)
         for i in self.idToName:
             for s in services:
@@ -200,6 +198,10 @@ class DataManager:
         self.sendMessage(req, "conc")
 
     def storeMagnet(self, deviceID, timeStamp, magnet):
+        self.writeCVS(timeStamp)
+        index = self.index.index(deviceID)
+        for i in range(3):
+            self.cvsLine[index*self.numberServices + 8 + i] = str("%2.3f" %magnet[i])
         req = {
                "msg": "req",
                "verb": "post",
@@ -432,7 +434,7 @@ class App(CbApp):
                     break
 
     def onAdaptorFunctions(self, message):
-        #logging.debug("%s onAdaptorFunctions, message: %s", ModuleName, message)
+        logging.debug("%s onAdaptorFunctions, message: %s", ModuleName, message)
         self.devServices.append(message)
         serviceReq = []
         for p in message["functions"]:
@@ -451,20 +453,22 @@ class App(CbApp):
                                        "interval": SENSOR_POLLING_INTERVAL})
             elif p["parameter"] == "acceleration":
                 if ACCEL:
-                    self.accel.append(Accelerometer(self.idToName(message["id"])))
+                    self.accel.append(Accelerometer((self.idToName[message["id"]])))
                     serviceReq.append({"parameter": "acceleration",
-                                      "intervale": 0.3})
+                                       "interval": SENSOR_POLLING_INTERVAL})
                     self.accel[-1].dm = self.dm
             elif p["parameter"] == "gyro":
                 if GYRO:
                     self.gyro.append(Gyro(self.idToName[message["id"]]))
                     self.gyro[-1].dm = self.dm
-                    serviceReq.append("gyro")
+                    serviceReq.append({"parameter": "gyro",
+                                       "interval": SENSOR_POLLING_INTERVAL})
             elif p["parameter"] == "magnetometer":
                 if MAGNET: 
                     self.magnet.append(Magnet(self.idToName[message["id"]]))
                     self.magnet[-1].dm = self.dm
-                    serviceReq.append("magnetometer")
+                    serviceReq.append({"parameter": "magnetometer",
+                                       "interval": SENSOR_POLLING_INTERVAL})
             elif p["parameter"] == "buttons":
                 if BUTTONS:
                     self.buttons.append(Buttons(self.idToName[message["id"]]))
