@@ -13,6 +13,8 @@ import time
 import logging
 from cbcommslib import CbApp
 from cbconfig import *
+import requests
+import json
 
 # Sensor enables and min changes that will register. Can be overridden in environment
 TEMP                     = str2bool(os.getenv('EEW_TEMP', 'True'))
@@ -29,193 +31,74 @@ ACCEL_MIN_CHANGE         = float(os.getenv('EEW__ACCEL_MIN_CHANGE', '0.02'))
 GYRO_MIN_CHANGE          = float(os.getenv('EEW_GYRO_MIN_CHANGE', '0.5'))
 MAGNET_MIN_CHANGE        = float(os.getenv('EEW_MAGNET_MIN_CHANGE', '1.0'))
 SENSOR_POLLING_INTERVAL  = float(os.getenv('EEW_SENSOR_POLLING_INTERVAL', '30.0'))
+USER                     = "ea2f0e06ff8123b7f46f77a3a451731a"
 
 
 class DataManager:
     """ Managers data storage for all sensors """
-    def __init__(self, sendMessage):
-        self.sendMessage = sendMessage
-        self.now = self.niceTime(time.time())
-        self.cvsList = []
-        self.cvsLine = []
-        self.index = []
+    def __init__(self, bridge_id):
+        self.baseurl = "http://geras.1248.io/series/" + bridge_id + "/"
 
-    def niceTime(self, timeStamp):
-        localtime = time.localtime(timeStamp)
-        milliseconds = '%03d' % int((timeStamp - int(timeStamp)) * 1000)
-        now = time.strftime('%Y:%m:%d,  %H:%M:%S:', localtime) + milliseconds
-        return now
-
-    def writeCVS(self, timeStamp):
-        self.then = self.now
-        self.now = self.niceTime(timeStamp)
-        if self.now != self.then:
-            self.f.write(self.then + ",")
-            for i in range(len(self.cvsLine)):
-                self.f.write(self.cvsLine[i] + ",")
-                self.cvsLine[i] = ""
-            self.f.write("\n")
-
-    def initFile(self, idToName):
-        self.idToName = idToName
-        for i in self.idToName:
-            self.index.append(self.idToName[i])
-        services = ["temperature", 
-                    "ir_temperature", 
-                    "accel x", "accel y", "accel z",
-                    "buttons l", "buttons r",
-                    "rel humidily",
-                    "gyro x", "gyro y", "gyro z"]
-        self.numberServices = len(services)
-        for i in self.idToName:
-            for s in services:
-                self.cvsList.append(s)
-                self.cvsLine.append("")
-        fileName = CB_CONFIG_DIR + "eew_app.csv"
-        if os.path.isfile(fileName):
-            self.f = open(fileName, "a+", 0)
-        else:
-            self.f = open(fileName, "a+", 0)
-            for d in self.idToName:
-                self.f.write(d + ", " + self.idToName[d] + "\n")
-            self.f.write("date, time, ")
-            for i in self.cvsList:
-                self.f.write(i + ", ")
-            self.f.write("\n")
+    def sendValues(self, values, deviceID):
+        url = self.baseurl + deviceID
+        headers = {'Content-Type': 'application/json'}
+        r = requests.post(url, auth=(USER, ''), data=json.dumps(values), headers=headers)
 
     def storeAccel(self, deviceID, timeStamp, a):
-        self.writeCVS(timeStamp)
-        index = self.index.index(deviceID)
-        for i in range(3):
-            self.cvsLine[index*self.numberServices + 2 + i] = str("%2.3f" %a[i])
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "timeStamp": timeStamp,
-                        "type": "accel",
-                        "data": a
-                       }
-              }
-        self.sendMessage(req, "conc")
+        values = { "e":[
+                        {"n":"accel_x", "v":accel[0], "t":timeStamp},
+                        {"n":"accel_y", "v":accel[1], "t":timeStamp},
+                        {"n":"accel_z", "v":accel[2], "t":timeStamp}
+                      ]
+                 }    
+        values =         self.sendValues(values, deviceID)
 
     def storeTemp(self, deviceID, timeStamp, temp):
-        self.writeCVS(timeStamp)
-        index = self.index.index(deviceID)
-        self.cvsLine[index*self.numberServices + 0] = str("%2.1f" %temp)
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "type": "temperature",
-                        "timeStamp": timeStamp,
-                        "data": temp
-                       }
-              }
-        self.sendMessage(req, "conc")
+        values = { "e":[
+                        {"n":"temperature", "v":temp, "t":timeStamp}
+                       ]
+                 }    
+        self.sendValues(values, deviceID)
 
     def storeIrTemp(self, deviceID, timeStamp, temp):
-        self.writeCVS(timeStamp)
-        index = self.index.index(deviceID)
-        self.cvsLine[index*self.numberServices + 1] = str("%2.1f" %temp)
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "type": "ir_temperature",
-                        "timeStamp": timeStamp,
-                        "data": temp
-                       }
-              }
-        self.sendMessage(req, "conc")
+        values = { "e":[
+                        {"n":"ir_temperature", "v":temp, "t":timeStamp}
+                       ]
+                 }    
+        self.sendValues(values, deviceID)
 
     def storeHumidity(self, deviceID, timeStamp, h):
-        self.writeCVS(timeStamp)
-        index = self.index.index(deviceID)
-        self.cvsLine[index*self.numberServices + 7] = str("%2.1f" %h)
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "type": "rel_humidity",
-                        "timeStamp": timeStamp,
-                        "data": h
-                       }
-              }
-        self.sendMessage(req, "conc")
-
+        values = { "e":[
+                        {"n":"humidity", "v":h, "t":timeStamp}
+                       ]
+                 }    
+        self.sendValues(values, deviceID)
 
     def storeButtons(self, deviceID, timeStamp, buttons):
-        self.writeCVS(timeStamp)
-        index = self.index.index(deviceID)
-        self.cvsLine[index*self.numberServices + 5] = str(buttons["leftButton"])
-        self.cvsLine[index*self.numberServices + 6] = str(buttons["rightButton"])
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "type": "buttons",
-                        "timeStamp": timeStamp,
-                        "data": [buttons["leftButton"], buttons["rightButton"]]
-                       }
-              }
-        self.sendMessage(req, "conc")
+        values = { "e":[
+                        {"n":"left_button", "v":buttons["leftButton"], "t":timeStamp},
+                        {"n":"right_button", "v":buttons["rightButton"], "t":timeStamp}
+                      ]
+                 }    
+        self.sendValues(values, deviceID)
 
     def storeGyro(self, deviceID, timeStamp, gyro):
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "type": "gyro",
-                        "timeStamp": timeStamp,
-                        "data": gyro
-                       }
-              }
-        self.sendMessage(req, "conc")
+        values = { "e":[
+                        {"n":"gyro_x", "v":gyro[0], "t":timeStamp},
+                        {"n":"gyro_y", "v":gyro[1], "t":timeStamp},
+                        {"n":"gyro_z", "v":gyro[2], "t":timeStamp}
+                      ]
+                 }    
+        self.sendValues(values, deviceID)
 
     def storeMagnet(self, deviceID, timeStamp, magnet):
-        self.writeCVS(timeStamp)
-        index = self.index.index(deviceID)
-        for i in range(3):
-            self.cvsLine[index*self.numberServices + 8 + i] = str("%2.3f" %magnet[i])
-        req = {
-               "msg": "req",
-               "verb": "post",
-               "channel": self.appNum,
-               "body": {
-                        "msg": "data",
-                        "appID": self.appID,
-                        "deviceID": deviceID,
-                        "type": "magnetometer",
-                        "timeStamp": timeStamp,
-                        "data": magnet
-                       }
-              }
-        self.sendMessage(req, "conc")
+        values = { "e":[
+                        {"n":"magnet_x", "v":magnet[0], "t":timeStamp},
+                        {"n":"magnet_y", "v":magnet[1], "t":timeStamp},
+                        {"n":"magnet_z", "v":magnet[2], "t":timeStamp}
+                      ]
+                 }    
+        self.sendValues(values, deviceID)
 
 class Accelerometer:
     def __init__(self, id):
@@ -356,7 +239,6 @@ class App(CbApp):
         self.devices = []
         self.devServices = [] 
         self.idToName = {} 
-        self.dm = DataManager(self.sendMessage)
         #CbApp.__init__ MUST be called
         CbApp.__init__(self, argv)
 
@@ -489,8 +371,6 @@ class App(CbApp):
 
     def onConfigureMessage(self, config):
         """ Config is based on what sensors are available """
-        self.dm.appID = self.id
-        self.dm.appNum = int(self.id[3:])
         for adaptor in config["adaptors"]:
             adtID = adaptor["id"]
             if adtID not in self.devices:
@@ -500,7 +380,7 @@ class App(CbApp):
                 logging.debug("%s Configure app. Adaptor name: %s", ModuleName, name)
                 self.idToName[adtID] = friendly_name.replace(" ", "_")
                 self.devices.append(adtID)
-        self.dm.initFile(self.idToName)
+        self.dm = DataManager(self.bridge_id)
         self.setState("starting")
 
 if __name__ == '__main__':
