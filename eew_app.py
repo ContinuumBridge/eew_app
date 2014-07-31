@@ -309,7 +309,7 @@ class App(CbApp):
                 if b.id == self.idToName[message["id"]]:
                     b.processButtons(message)
                     break
-        elif message["content"] == "rel_humidity":
+        elif message["content"] == "humidity":
             for b in self.humidity:
                 if b.id == self.idToName[message["id"]]:
                     b.processHumidity(message)
@@ -357,11 +357,11 @@ class App(CbApp):
                     self.buttons[-1].dm = self.dm
                     serviceReq.append({"parameter": "buttons",
                                       "interval": 0})
-            elif p["parameter"] == "rel_humidity":
+            elif p["parameter"] == "humidity":
                 if HUMIDITY:
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
-                    serviceReq.append({"parameter": "rel_humidity",
+                    serviceReq.append({"parameter": "humidity",
                                       "interval": SENSOR_POLLING_INTERVAL})
         msg = {"id": self.id,
                "request": "functions",
