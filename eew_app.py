@@ -15,6 +15,7 @@ from cbcommslib import CbApp
 from cbconfig import *
 import requests
 import json
+from twisted.internet import reactor
 
 # Sensor enables and min changes that will register. Can be overridden in environment
 TEMP                     = str2bool(os.getenv('EEW_TEMP', 'True'))
@@ -24,81 +25,111 @@ HUMIDITY                 = str2bool(os.getenv('EEW_HUMIDITY', 'False'))
 GYRO                     = str2bool(os.getenv('EEW_GYRO', 'False'))
 MAGNET                   = str2bool(os.getenv('EEW_MAGNET', 'False'))
 BUTTONS                  = str2bool(os.getenv('EEW_BUTTONS', 'False'))
+BINARY                   = str2bool(os.getenv('EEW_BINARY', 'True'))
 TEMP_MIN_CHANGE          = float(os.getenv('EEW_TEMP_MIN_CHANGE', '0.2'))
 IRTEMP_MIN_CHANGE        = float(os.getenv('EEW_IRTEMP_MIN_CHANGE', '0.5'))
 HUMIDITY_MIN_CHANGE      = float(os.getenv('EEW_HUMIDITY_MIN_CHANGE', '0.5'))
 ACCEL_MIN_CHANGE         = float(os.getenv('EEW__ACCEL_MIN_CHANGE', '0.02'))
 GYRO_MIN_CHANGE          = float(os.getenv('EEW_GYRO_MIN_CHANGE', '0.5'))
-MAGNET_MIN_CHANGE        = float(os.getenv('EEW_MAGNET_MIN_CHANGE', '1.0'))
-SENSOR_POLLING_INTERVAL  = float(os.getenv('EEW_SENSOR_POLLING_INTERVAL', '30.0'))
+MAGNET_MIN_CHANGE        = float(os.getenv('EEW_MAGNET_MIN_CHANGE', '1.5'))
+SLOW_POLLING_INTERVAL    = float(os.getenv('EEW_SLOW_POLLING_INTERVAL', '120.0'))
+FAST_POLLING_INTERVAL    = float(os.getenv('EEW_FAST_POLLING_INTERVAL', '3.0'))
 USER                     = "ea2f0e06ff8123b7f46f77a3a451731a"
-
+SEND_DELAY               = 20  # Time to gather values for a device before sending them
 
 class DataManager:
     """ Managers data storage for all sensors """
     def __init__(self, bridge_id):
         self.baseurl = "http://geras.1248.io/series/" + bridge_id + "/"
+        self.s={}
+        self.waiting=[]
 
-    def sendValues(self, values, deviceID):
+    def sendValuesThread(self, values, deviceID):
         url = self.baseurl + deviceID
+        status = 0
+        logging.debug("%s sendValues, device: %s length: %s", ModuleName, deviceID, str(len(values)))
         headers = {'Content-Type': 'application/json'}
-        r = requests.post(url, auth=(USER, ''), data=json.dumps(values), headers=headers)
+        try:
+            r = requests.post(url, auth=(USER, ''), data=json.dumps({"e": values}), headers=headers)
+            status = r.status_code
+            success = True
+        except:
+            success = False
+        if status !=200 or not success:
+            logging.debug("%s sendValues failed, status: %s", ModuleName, status)
+            # On error, store the values that weren't sent ready to be sent again
+            reactor.callFromThread(self.storeValues, values, deviceID)
+
+    def sendValues(self, deviceID):
+        values = self.s[deviceID]
+        # Call in thread as it may take a second or two
+        self.waiting.remove(deviceID)
+        del self.s[deviceID]
+        reactor.callInThread(self.sendValuesThread, values, deviceID)
+
+    def storeValues(self, values, deviceID):
+        if not deviceID in self.s:
+            self.s[deviceID] = values
+        else:
+            self.s[deviceID].append(values)
+        if not deviceID in self.waiting:
+            reactor.callLater(SEND_DELAY, self.sendValues, deviceID)
+            self.waiting.append(deviceID)
 
     def storeAccel(self, deviceID, timeStamp, a):
-        values = { "e":[
-                        {"n":"accel_x", "v":accel[0], "t":timeStamp},
-                        {"n":"accel_y", "v":accel[1], "t":timeStamp},
-                        {"n":"accel_z", "v":accel[2], "t":timeStamp}
-                      ]
-                 }    
-        values =         self.sendValues(values, deviceID)
+        values = [
+                  {"n":"accel_x", "v":accel[0], "t":timeStamp},
+                  {"n":"accel_y", "v":accel[1], "t":timeStamp},
+                  {"n":"accel_z", "v":accel[2], "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
     def storeTemp(self, deviceID, timeStamp, temp):
-        values = { "e":[
-                        {"n":"temperature", "v":temp, "t":timeStamp}
-                       ]
-                 }    
-        self.sendValues(values, deviceID)
+        values = [
+                  {"n":"temperature", "v":temp, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
     def storeIrTemp(self, deviceID, timeStamp, temp):
-        values = { "e":[
-                        {"n":"ir_temperature", "v":temp, "t":timeStamp}
-                       ]
-                 }    
-        self.sendValues(values, deviceID)
+        values = [
+                  {"n":"ir_temperature", "v":temp, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
     def storeHumidity(self, deviceID, timeStamp, h):
-        values = { "e":[
-                        {"n":"humidity", "v":h, "t":timeStamp}
-                       ]
-                 }    
-        self.sendValues(values, deviceID)
+        values = [
+                  {"n":"humidity", "v":h, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
     def storeButtons(self, deviceID, timeStamp, buttons):
-        values = { "e":[
-                        {"n":"left_button", "v":buttons["leftButton"], "t":timeStamp},
-                        {"n":"right_button", "v":buttons["rightButton"], "t":timeStamp}
-                      ]
-                 }    
-        self.sendValues(values, deviceID)
+        values = [
+                  {"n":"left_button", "v":buttons["leftButton"], "t":timeStamp},
+                  {"n":"right_button", "v":buttons["rightButton"], "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
     def storeGyro(self, deviceID, timeStamp, gyro):
-        values = { "e":[
-                        {"n":"gyro_x", "v":gyro[0], "t":timeStamp},
-                        {"n":"gyro_y", "v":gyro[1], "t":timeStamp},
-                        {"n":"gyro_z", "v":gyro[2], "t":timeStamp}
-                      ]
-                 }    
-        self.sendValues(values, deviceID)
+        values = [
+                  {"n":"gyro_x", "v":gyro[0], "t":timeStamp},
+                  {"n":"gyro_y", "v":gyro[1], "t":timeStamp},
+                  {"n":"gyro_z", "v":gyro[2], "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
     def storeMagnet(self, deviceID, timeStamp, magnet):
-        values = { "e":[
-                        {"n":"magnet_x", "v":magnet[0], "t":timeStamp},
-                        {"n":"magnet_y", "v":magnet[1], "t":timeStamp},
-                        {"n":"magnet_z", "v":magnet[2], "t":timeStamp}
-                      ]
-                 }    
-        self.sendValues(values, deviceID)
+        values = [
+                  {"n":"magnet_x", "v":magnet[0], "t":timeStamp},
+                  {"n":"magnet_y", "v":magnet[1], "t":timeStamp},
+                  {"n":"magnet_z", "v":magnet[2], "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
+
+    def storeBinary(self, deviceID, timeStamp, b):
+        values = [
+                  {"n":"binary", "v":b, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
 
 class Accelerometer:
     def __init__(self, id):
@@ -223,6 +254,19 @@ class Humid():
             self.dm.storeHumidity(self.id, timeStamp, h) 
             self.previous = h
 
+class Binary():
+    def __init__(self, id):
+        self.id = id
+
+    def processBinary(self, resp):
+        timeStamp = resp["timeStamp"] 
+        b = resp["data"]
+        if b == "on":
+            bi = 1
+        else:
+            bi = 0
+        self.dm.storeBinary(self.id, timeStamp, bi)
+
 class App(CbApp):
     def __init__(self, argv):
         logging.basicConfig(filename=CB_LOGFILE,level=CB_LOGGING_LEVEL,format='%(asctime)s %(message)s')
@@ -236,6 +280,7 @@ class App(CbApp):
         self.irTemp = []
         self.buttons = []
         self.humidity = []
+        self.binary = []
         self.devices = []
         self.devServices = [] 
         self.idToName = {} 
@@ -314,9 +359,14 @@ class App(CbApp):
                 if b.id == self.idToName[message["id"]]:
                     b.processHumidity(message)
                     break
+        elif message["content"] == "binary_sensor":
+            for b in self.binary:
+                if b.id == self.idToName[message["id"]]:
+                    b.processBinary(message)
+                    break
 
     def onAdaptorFunctions(self, message):
-        logging.debug("%s onAdaptorFunctions, message: %s", ModuleName, message)
+        #logging.debug("%s onAdaptorFunctions, message: %s", ModuleName, message)
         self.devServices.append(message)
         serviceReq = []
         for p in message["functions"]:
@@ -326,31 +376,31 @@ class App(CbApp):
                     self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
                     serviceReq.append({"parameter": "temperature",
-                                       "interval": SENSOR_POLLING_INTERVAL})
+                                       "interval": SLOW_POLLING_INTERVAL})
             elif p["parameter"] == "ir_temperature":
                 if IRTEMP:
                     self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
                     serviceReq.append({"parameter": "ir_temperature",
-                                       "interval": SENSOR_POLLING_INTERVAL})
+                                       "interval": SLOW_POLLING_INTERVAL})
             elif p["parameter"] == "acceleration":
                 if ACCEL:
                     self.accel.append(Accelerometer((self.idToName[message["id"]])))
                     serviceReq.append({"parameter": "acceleration",
-                                       "interval": SENSOR_POLLING_INTERVAL})
+                                       "interval": FAST_POLLING_INTERVAL})
                     self.accel[-1].dm = self.dm
             elif p["parameter"] == "gyro":
                 if GYRO:
                     self.gyro.append(Gyro(self.idToName[message["id"]]))
                     self.gyro[-1].dm = self.dm
                     serviceReq.append({"parameter": "gyro",
-                                       "interval": SENSOR_POLLING_INTERVAL})
+                                       "interval": FAST_POLLING_INTERVAL})
             elif p["parameter"] == "magnetometer":
                 if MAGNET: 
                     self.magnet.append(Magnet(self.idToName[message["id"]]))
                     self.magnet[-1].dm = self.dm
                     serviceReq.append({"parameter": "magnetometer",
-                                       "interval": SENSOR_POLLING_INTERVAL})
+                                       "interval": FAST_POLLING_INTERVAL})
             elif p["parameter"] == "buttons":
                 if BUTTONS:
                     self.buttons.append(Buttons(self.idToName[message["id"]]))
@@ -362,7 +412,13 @@ class App(CbApp):
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
                     serviceReq.append({"parameter": "humidity",
-                                      "interval": SENSOR_POLLING_INTERVAL})
+                                      "interval": SLOW_POLLING_INTERVAL})
+            elif p["parameter"] == "binary_sensor":
+                if BINARY:
+                    self.binary.append(Binary(self.idToName[message["id"]]))
+                    self.binary[-1].dm = self.dm
+                    serviceReq.append({"parameter": "binary_sensor",
+                                      "interval": 0})
         msg = {"id": self.id,
                "request": "functions",
                "functions": serviceReq}
