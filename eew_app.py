@@ -257,14 +257,17 @@ class Humid():
 class Binary():
     def __init__(self, id):
         self.id = id
+        self.previous = 0
 
     def processBinary(self, resp):
         timeStamp = resp["timeStamp"] 
+        self.dm.storeBinary(self.id, timeStamp-0.5, self.previous)
         b = resp["data"]
         if b == "on":
             bi = 1
         else:
             bi = 0
+        self.previous = bi
         self.dm.storeBinary(self.id, timeStamp, bi)
 
 class App(CbApp):
