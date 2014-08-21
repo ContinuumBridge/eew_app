@@ -350,115 +350,115 @@ class App(CbApp):
         problems if it takes some time to complete (other than to itself).
         """
         #logging.debug("%s onadaptorData, message: %s", ModuleName, message)
-        if message["content"] == "acceleration":
+        if message["characteristic"] == "acceleration":
             for a in self.accel:
                 if a.id == self.idToName[message["id"]]: 
                     a.processAccel(message)
                     break
-        elif message["content"] == "temperature":
+        elif message["characteristic"] == "temperature":
             for t in self.temp:
                 if t.id == self.idToName[message["id"]]:
                     t.processTemp(message)
                     break
-        elif message["content"] == "ir_temperature":
+        elif message["characteristic"] == "ir_temperature":
             for t in self.irTemp:
                 if t.id == self.idToName[message["id"]]:
                     t.processIrTemp(message)
                     break
-        elif message["content"] == "gyro":
+        elif message["characteristic"] == "gyro":
             for g in self.gyro:
                 if g.id == self.idToName[message["id"]]:
                     g.processGyro(message)
                     break
-        elif message["content"] == "magnetometer":
+        elif message["characteristic"] == "magnetometer":
             for g in self.magnet:
                 if g.id == self.idToName[message["id"]]:
                     g.processMagnet(message)
                     break
-        elif message["content"] == "buttons":
+        elif message["characteristic"] == "buttons":
             for b in self.buttons:
                 if b.id == self.idToName[message["id"]]:
                     b.processButtons(message)
                     break
-        elif message["content"] == "humidity":
+        elif message["characteristic"] == "humidity":
             for b in self.humidity:
                 if b.id == self.idToName[message["id"]]:
                     b.processHumidity(message)
                     break
-        elif message["content"] == "binary_sensor":
+        elif message["characteristic"] == "binary_sensor":
             for b in self.binary:
                 if b.id == self.idToName[message["id"]]:
                     b.processBinary(message)
                     break
-        elif message["content"] == "luminance":
+        elif message["characteristic"] == "luminance":
             for b in self.luminance:
                 if b.id == self.idToName[message["id"]]:
                     b.processLuminance(message)
                     break
 
-    def onAdaptorFunctions(self, message):
-        #logging.debug("%s onAdaptorFunctions, message: %s", ModuleName, message)
+    def onAdaptorService(self, message):
+        #logging.debug("%s onAdaptorService, message: %s", ModuleName, message)
         self.devServices.append(message)
         serviceReq = []
-        for p in message["functions"]:
+        for p in message["service"]:
             # Based on services offered & whether we want to enable them
-            if p["parameter"] == "temperature":
+            if p["characteristic"] == "temperature":
                 if TEMP:
                     self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
-                    serviceReq.append({"parameter": "temperature",
+                    serviceReq.append({"characteristic": "temperature",
                                        "interval": SLOW_POLLING_INTERVAL})
-            elif p["parameter"] == "ir_temperature":
+            elif p["characteristic"] == "ir_temperature":
                 if IRTEMP:
                     self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
-                    serviceReq.append({"parameter": "ir_temperature",
+                    serviceReq.append({"characteristic": "ir_temperature",
                                        "interval": SLOW_POLLING_INTERVAL})
-            elif p["parameter"] == "acceleration":
+            elif p["characteristic"] == "acceleration":
                 if ACCEL:
                     self.accel.append(Accelerometer((self.idToName[message["id"]])))
-                    serviceReq.append({"parameter": "acceleration",
+                    serviceReq.append({"characteristic": "acceleration",
                                        "interval": FAST_POLLING_INTERVAL})
                     self.accel[-1].dm = self.dm
-            elif p["parameter"] == "gyro":
+            elif p["characteristic"] == "gyro":
                 if GYRO:
                     self.gyro.append(Gyro(self.idToName[message["id"]]))
                     self.gyro[-1].dm = self.dm
-                    serviceReq.append({"parameter": "gyro",
+                    serviceReq.append({"characteristic": "gyro",
                                        "interval": FAST_POLLING_INTERVAL})
-            elif p["parameter"] == "magnetometer":
+            elif p["characteristic"] == "magnetometer":
                 if MAGNET: 
                     self.magnet.append(Magnet(self.idToName[message["id"]]))
                     self.magnet[-1].dm = self.dm
-                    serviceReq.append({"parameter": "magnetometer",
+                    serviceReq.append({"characteristic": "magnetometer",
                                        "interval": FAST_POLLING_INTERVAL})
-            elif p["parameter"] == "buttons":
+            elif p["characteristic"] == "buttons":
                 if BUTTONS:
                     self.buttons.append(Buttons(self.idToName[message["id"]]))
                     self.buttons[-1].dm = self.dm
-                    serviceReq.append({"parameter": "buttons",
+                    serviceReq.append({"characteristic": "buttons",
                                        "interval": 0})
-            elif p["parameter"] == "humidity":
+            elif p["characteristic"] == "humidity":
                 if HUMIDITY:
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
-                    serviceReq.append({"parameter": "humidity",
+                    serviceReq.append({"characteristic": "humidity",
                                        "interval": SLOW_POLLING_INTERVAL})
-            elif p["parameter"] == "binary_sensor":
+            elif p["characteristic"] == "binary_sensor":
                 if BINARY:
                     self.binary.append(Binary(self.idToName[message["id"]]))
                     self.binary[-1].dm = self.dm
-                    serviceReq.append({"parameter": "binary_sensor",
+                    serviceReq.append({"characteristic": "binary_sensor",
                                        "interval": 0})
-            elif p["parameter"] == "luminance":
+            elif p["characteristic"] == "luminance":
                 if LUMINANCE:
                     self.luminance.append(Luminance(self.idToName[message["id"]]))
                     self.luminance[-1].dm = self.dm
-                    serviceReq.append({"parameter": "luminance",
+                    serviceReq.append({"characteristic": "luminance",
                                        "interval": 0})
         msg = {"id": self.id,
-               "request": "functions",
-               "functions": serviceReq}
+               "request": "service",
+               "service": serviceReq}
         self.sendMessage(msg, message["id"])
         self.setState("running")
 
