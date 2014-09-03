@@ -17,27 +17,31 @@ import requests
 import json
 from twisted.internet import reactor
 
-# Sensor enables and min changes that will register. Can be overridden in environment
-TEMP                     = str2bool(os.getenv('EEW_TEMP', 'True'))
-IRTEMP                   = str2bool(os.getenv('EEW_IRTEMP', 'False'))
-ACCEL                    = str2bool(os.getenv('EEW_ACCEL', 'False'))
-HUMIDITY                 = str2bool(os.getenv('EEW_HUMIDITY', 'False'))
-GYRO                     = str2bool(os.getenv('EEW_GYRO', 'False'))
-MAGNET                   = str2bool(os.getenv('EEW_MAGNET', 'False'))
-BUTTONS                  = str2bool(os.getenv('EEW_BUTTONS', 'False'))
-BINARY                   = str2bool(os.getenv('EEW_BINARY', 'True'))
-LUMINANCE                = str2bool(os.getenv('EEW_LUMINANCE', 'True'))
-TEMP_MIN_CHANGE          = float(os.getenv('EEW_TEMP_MIN_CHANGE', '0.2'))
-IRTEMP_MIN_CHANGE        = float(os.getenv('EEW_IRTEMP_MIN_CHANGE', '0.5'))
-HUMIDITY_MIN_CHANGE      = float(os.getenv('EEW_HUMIDITY_MIN_CHANGE', '0.5'))
-LUMINANCE_MIN_CHANGE     = float(os.getenv('EEW_LUMINANCE_MIN_CHANGE', '1.0'))
-ACCEL_MIN_CHANGE         = float(os.getenv('EEW__ACCEL_MIN_CHANGE', '0.02'))
-GYRO_MIN_CHANGE          = float(os.getenv('EEW_GYRO_MIN_CHANGE', '0.5'))
-MAGNET_MIN_CHANGE        = float(os.getenv('EEW_MAGNET_MIN_CHANGE', '1.5'))
-SLOW_POLLING_INTERVAL    = float(os.getenv('EEW_SLOW_POLLING_INTERVAL', '300.0'))
-FAST_POLLING_INTERVAL    = float(os.getenv('EEW_FAST_POLLING_INTERVAL', '3.0'))
 USER                     = "ea2f0e06ff8123b7f46f77a3a451731a"
 SEND_DELAY               = 20  # Time to gather values for a device before sending them
+# Default values:
+config = {
+    'temperature': 'True',
+    'temp_min_change': 0.2,
+    'irtemperature': 'False',
+    'irtemp_min_change': 0.5,
+    'humidity': 'False',
+    'humidity_min_change': 0.5,
+    'buttons': 'False',
+    'accel': 'False',
+    'accel_min_change': 0.02,
+    'accel_polling_interval': 3.0,
+    'gyro': 'False',
+    'gyro_min_change': 0.5,
+    "gyro_polling_interval": 3.0,
+    'magnet': 'False',
+    'magnet_min_change': 1.5,
+    'magnet_polling_interval': 3.0,
+    'binary': 'True',
+    'luminance': 'True',
+    'luminance_min_change': 1.0,
+    'slow_polling_interval': 300.0
+}
 
 class DataManager:
     """ Managers data storage for all sensors """
@@ -80,9 +84,9 @@ class DataManager:
 
     def storeAccel(self, deviceID, timeStamp, a):
         values = [
-                  {"n":"accel_x", "v":accel[0], "t":timeStamp},
-                  {"n":"accel_y", "v":accel[1], "t":timeStamp},
-                  {"n":"accel_z", "v":accel[2], "t":timeStamp}
+                  {"n":"accel_x", "v":a[0], "t":timeStamp},
+                  {"n":"accel_y", "v":a[1], "t":timeStamp},
+                  {"n":"accel_z", "v":a[2], "t":timeStamp}
                  ]
         self.storeValues(values, deviceID)
 
@@ -149,7 +153,7 @@ class Accelerometer:
         timeStamp = resp["timeStamp"]
         event = False
         for a in range(3):
-            if abs(accel[a] - self.previous[a]) > ACCEL_MIN_CHANGE:
+            if abs(accel[a] - self.previous[a]) > config["accel_min_change"]:
                 event = True
                 break
         if event:
@@ -177,7 +181,7 @@ class TemperatureMeasure():
                 self.dm.storeTemp(self.id, self.prevEpochMin, temp) 
                 self.prevEpochMin = epochMin
         else:
-            if abs(temp-self.currentTemp) >= TEMP_MIN_CHANGE:
+            if abs(temp-self.currentTemp) >= config["temp_min_change"]:
                 self.dm.storeTemp(self.id, timeStamp, temp) 
                 self.currentTemp = temp
 
@@ -202,7 +206,7 @@ class IrTemperatureMeasure():
                 self.dm.storeIrTemp(self.id, self.prevEpochMin, temp) 
                 self.prevEpochMin = epochMin
         else:
-            if abs(temp-self.currentTemp) >= IRTEMP_MIN_CHANGE:
+            if abs(temp-self.currentTemp) >= config["irtemp_min_change"]:
                 self.dm.storeIrTemp(self.id, timeStamp, temp) 
                 self.currentTemp = temp
 
@@ -225,7 +229,7 @@ class Gyro():
         timeStamp = resp["timeStamp"] 
         event = False
         for a in range(3):
-            if abs(gyro[a] - self.previous[a]) > GYRO_MIN_CHANGE:
+            if abs(gyro[a] - self.previous[a]) > config["gyro_min_change"]:
                 event = True
                 break
         if event:
@@ -242,7 +246,7 @@ class Magnet():
         timeStamp = resp["timeStamp"] 
         event = False
         for a in range(3):
-            if abs(mag[a] - self.previous[a]) > MAGNET_MIN_CHANGE:
+            if abs(mag[a] - self.previous[a]) > config["magnet_min_change"]:
                 event = True
                 break
         if event:
@@ -258,7 +262,7 @@ class Humid():
     def processHumidity (self, resp):
         h = resp["data"]
         timeStamp = resp["timeStamp"] 
-        if abs(h-self.previous) >= HUMIDITY_MIN_CHANGE:
+        if abs(h-self.previous) >= config["humidity_min_change"]:
             self.dm.storeHumidity(self.id, timeStamp, h) 
             self.previous = h
 
@@ -287,7 +291,7 @@ class Luminance():
     def processLuminance(self, resp):
         v = resp["data"]
         timeStamp = resp["timeStamp"] 
-        if abs(v-self.previous) >= LUMINANCE_MIN_CHANGE:
+        if abs(v-self.previous) >= config["luminance_min_change"]:
             self.dm.storeLuminance(self.id, timeStamp, v) 
             self.previous = v
 
@@ -297,6 +301,16 @@ class App(CbApp):
         self.appClass = "monitor"
         self.state = "stopped"
         self.status = "ok"
+        configFile = CB_CONFIG_DIR + "eew_app.config"
+        global config
+        try:
+            with open(configFile, 'r') as configFile:
+                newConfig = json.load(configFile)
+                logging.info('%s Read eew_app.config', ModuleName)
+                config.update(newConfig)
+        except:
+            logging.warning('%s eew_app.config does not exist or file is corrupt', ModuleName)
+        logging.debug('%s Config: %s', ModuleName, config)
         self.accel = []
         self.gyro = []
         self.magnet = []
@@ -403,55 +417,55 @@ class App(CbApp):
         for p in message["service"]:
             # Based on services offered & whether we want to enable them
             if p["characteristic"] == "temperature":
-                if TEMP:
+                if config["temperature"]:
                     self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
                     serviceReq.append({"characteristic": "temperature",
-                                       "interval": SLOW_POLLING_INTERVAL})
+                                       "interval": config["slow_polling_interval"]})
             elif p["characteristic"] == "ir_temperature":
-                if IRTEMP:
+                if config["irtemperature"]:
                     self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
                     serviceReq.append({"characteristic": "ir_temperature",
-                                       "interval": SLOW_POLLING_INTERVAL})
+                                       "interval": config["slow_polling_interval"]})
             elif p["characteristic"] == "acceleration":
-                if ACCEL:
+                if config["accel"]:
                     self.accel.append(Accelerometer((self.idToName[message["id"]])))
                     serviceReq.append({"characteristic": "acceleration",
-                                       "interval": FAST_POLLING_INTERVAL})
+                                       "interval": config["accel_polling_interval"]})
                     self.accel[-1].dm = self.dm
             elif p["characteristic"] == "gyro":
-                if GYRO:
+                if config["gyro"]:
                     self.gyro.append(Gyro(self.idToName[message["id"]]))
                     self.gyro[-1].dm = self.dm
                     serviceReq.append({"characteristic": "gyro",
-                                       "interval": FAST_POLLING_INTERVAL})
+                                       "interval": config["gyro_polling_interval"]})
             elif p["characteristic"] == "magnetometer":
-                if MAGNET: 
+                if config["magnet"]: 
                     self.magnet.append(Magnet(self.idToName[message["id"]]))
                     self.magnet[-1].dm = self.dm
                     serviceReq.append({"characteristic": "magnetometer",
-                                       "interval": FAST_POLLING_INTERVAL})
+                                       "interval": config["magnet_polling_interval"]})
             elif p["characteristic"] == "buttons":
-                if BUTTONS:
+                if config["buttons"]:
                     self.buttons.append(Buttons(self.idToName[message["id"]]))
                     self.buttons[-1].dm = self.dm
                     serviceReq.append({"characteristic": "buttons",
                                        "interval": 0})
             elif p["characteristic"] == "humidity":
-                if HUMIDITY:
+                if config["humidity"]:
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
                     serviceReq.append({"characteristic": "humidity",
-                                       "interval": SLOW_POLLING_INTERVAL})
+                                       "interval": config["slow_polling_interval"]})
             elif p["characteristic"] == "binary_sensor":
-                if BINARY:
+                if config["binary"]:
                     self.binary.append(Binary(self.idToName[message["id"]]))
                     self.binary[-1].dm = self.dm
                     serviceReq.append({"characteristic": "binary_sensor",
                                        "interval": 0})
             elif p["characteristic"] == "luminance":
-                if LUMINANCE:
+                if config["luminance"]:
                     self.luminance.append(Luminance(self.idToName[message["id"]]))
                     self.luminance[-1].dm = self.dm
                     serviceReq.append({"characteristic": "luminance",
