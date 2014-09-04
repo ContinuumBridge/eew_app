@@ -25,7 +25,7 @@ config = {
     'temp_min_change': 0.2,
     'irtemperature': 'False',
     'irtemp_min_change': 0.5,
-    'humidity': 'False',
+    'humidity': 'True',
     'humidity_min_change': 0.5,
     'buttons': 'False',
     'accel': 'False',
