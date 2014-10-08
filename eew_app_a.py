@@ -40,6 +40,11 @@ config = {
     'binary': 'True',
     'luminance': 'True',
     'luminance_min_change': 1.0,
+    'power': 'True',
+    'power_min_change': 1.0,
+    'battery': 'True',
+    'battery_min_change': 1.0,
+    'connected': 'True',
     'slow_polling_interval': 300.0
 }
 
@@ -143,6 +148,24 @@ class DataManager:
                  ]
         self.storeValues(values, deviceID)
 
+    def storePower(self, deviceID, timeStamp, v):
+        values = [
+                  {"n":"power", "v":v, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
+
+    def storeBattery(self, deviceID, timeStamp, v):
+        values = [
+                  {"n":"battery", "v":v, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
+
+    def storeConnected(self, deviceID, timeStamp, v):
+        values = [
+                  {"n":"connected", "v":v, "t":timeStamp}
+                 ]
+        self.storeValues(values, deviceID)
+
 class Accelerometer:
     def __init__(self, id):
         self.previous = [0.0, 0.0, 0.0]
@@ -169,7 +192,7 @@ class TemperatureMeasure():
         self.id = id
         epochTime = time.time()
         self.prevEpochMin = int(epochTime - epochTime%60)
-        self.currentTemp = 0.0
+        self.powerTemp = 0.0
 
     def processTemp (self, resp):
         timeStamp = resp["timeStamp"] 
@@ -181,9 +204,9 @@ class TemperatureMeasure():
                 self.dm.storeTemp(self.id, self.prevEpochMin, temp) 
                 self.prevEpochMin = epochMin
         else:
-            if abs(temp-self.currentTemp) >= config["temp_min_change"]:
+            if abs(temp-self.powerTemp) >= config["temp_min_change"]:
                 self.dm.storeTemp(self.id, timeStamp, temp) 
-                self.currentTemp = temp
+                self.powerTemp = temp
 
 class IrTemperatureMeasure():
     """ Either send temp every minute or when it changes. """
@@ -194,7 +217,7 @@ class IrTemperatureMeasure():
         self.id = id
         epochTime = time.time()
         self.prevEpochMin = int(epochTime - epochTime%60)
-        self.currentTemp = 0.0
+        self.powerTemp = 0.0
 
     def processIrTemp (self, resp):
         timeStamp = resp["timeStamp"] 
@@ -206,9 +229,9 @@ class IrTemperatureMeasure():
                 self.dm.storeIrTemp(self.id, self.prevEpochMin, temp) 
                 self.prevEpochMin = epochMin
         else:
-            if abs(temp-self.currentTemp) >= config["irtemp_min_change"]:
+            if abs(temp-self.powerTemp) >= config["irtemp_min_change"]:
                 self.dm.storeIrTemp(self.id, timeStamp, temp) 
-                self.currentTemp = temp
+                self.powerTemp = temp
 
 class Buttons():
     def __init__(self, id):
@@ -295,6 +318,51 @@ class Luminance():
             self.dm.storeLuminance(self.id, timeStamp, v) 
             self.previous = v
 
+class Power():
+    def __init__(self, id):
+        self.id = id
+        self.previous = 0
+        self.previousTime = time.time()
+
+    def processPower(self, resp):
+        v = resp["data"]
+        timeStamp = resp["timeStamp"] 
+        if abs(v-self.previous) >= config["power_min_change"]:
+            if timeStamp - self.previousTime > 2:
+                self.dm.storePower(self.id, timeStamp-1.0, self.previous)
+            self.dm.storePower(self.id, timeStamp, v) 
+            self.previous = v
+            self.previousTime = timeStamp
+
+class Battery():
+    def __init__(self, id):
+        self.id = id
+        self.previous = 0
+
+    def processBattery(self, resp):
+        v = resp["data"]
+        timeStamp = resp["timeStamp"] 
+        if abs(v-self.previous) >= config["battery_min_change"]:
+            self.dm.storeBattery(self.id, timeStamp, v) 
+            self.previous = v
+
+class Connected():
+    def __init__(self, id):
+        self.id = id
+        self.previous = 0
+
+    def processConnected(self, resp):
+        v = resp["data"]
+        timeStamp = resp["timeStamp"] 
+        if v:
+            b = 1
+        else:
+            b = 0
+        if b != self.previous:
+            self.dm.storeConnected(self.id, timeStamp-1.0, self.previous)
+            self.dm.storeConnected(self.id, timeStamp, b) 
+            self.previous = b
+
 class App(CbApp):
     def __init__(self, argv):
         logging.basicConfig(filename=CB_LOGFILE,level=CB_LOGGING_LEVEL,format='%(asctime)s %(message)s')
@@ -320,6 +388,9 @@ class App(CbApp):
         self.humidity = []
         self.binary = []
         self.luminance = []
+        self.power = []
+        self.battery = []
+        self.connected = []
         self.devices = []
         self.devServices = [] 
         self.idToName = {} 
@@ -404,6 +475,21 @@ class App(CbApp):
                 if b.id == self.idToName[message["id"]]:
                     b.processBinary(message)
                     break
+        elif message["characteristic"] == "power":
+            for b in self.power:
+                if b.id == self.idToName[message["id"]]:
+                    b.processPower(message)
+                    break
+        elif message["characteristic"] == "battery":
+            for b in self.battery:
+                if b.id == self.idToName[message["id"]]:
+                    b.processBattery(message)
+                    break
+        elif message["characteristic"] == "connected":
+            for b in self.connected:
+                if b.id == self.idToName[message["id"]]:
+                    b.processConnected(message)
+                    break
         elif message["characteristic"] == "luminance":
             for b in self.luminance:
                 if b.id == self.idToName[message["id"]]:
@@ -463,6 +549,24 @@ class App(CbApp):
                     self.binary.append(Binary(self.idToName[message["id"]]))
                     self.binary[-1].dm = self.dm
                     serviceReq.append({"characteristic": "binary_sensor",
+                                       "interval": 0})
+            elif p["characteristic"] == "power":
+                if config["power"]:
+                    self.power.append(Power(self.idToName[message["id"]]))
+                    self.power[-1].dm = self.dm
+                    serviceReq.append({"characteristic": "power",
+                                       "interval": 0})
+            elif p["characteristic"] == "battery":
+                if config["battery"]:
+                    self.battery.append(Battery(self.idToName[message["id"]]))
+                    self.battery[-1].dm = self.dm
+                    serviceReq.append({"characteristic": "battery",
+                                       "interval": 0})
+            elif p["characteristic"] == "connected":
+                if config["connected"]:
+                    self.connected.append(Connected(self.idToName[message["id"]]))
+                    self.connected[-1].dm = self.dm
+                    serviceReq.append({"characteristic": "connected",
                                        "interval": 0})
             elif p["characteristic"] == "luminance":
                 if config["luminance"]:
