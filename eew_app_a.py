@@ -26,7 +26,7 @@ config = {
     'irtemperature': 'False',
     'irtemp_min_change': 0.5,
     'humidity': 'True',
-    'humidity_min_change': 0.5,
+    'humidity_min_change': 0.2,
     'buttons': 'False',
     'accel': 'False',
     'accel_min_change': 0.02,
@@ -45,7 +45,7 @@ config = {
     'battery': 'True',
     'battery_min_change': 1.0,
     'connected': 'True',
-    'slow_polling_interval': 300.0
+    'slow_polling_interval': 600.0
 }
 
 class DataManager:
@@ -378,6 +378,11 @@ class App(CbApp):
                 config.update(newConfig)
         except:
             logging.warning('%s eew_app.config does not exist or file is corrupt', ModuleName)
+        for c in config:
+            if c.lower in ("true", "t", "1"):
+                config[c] = True
+            elif c.lower in ("false", "f", "0"):
+                config[c] = False
         logging.debug('%s Config: %s', ModuleName, config)
         self.accel = []
         self.gyro = []
@@ -503,73 +508,73 @@ class App(CbApp):
         for p in message["service"]:
             # Based on services offered & whether we want to enable them
             if p["characteristic"] == "temperature":
-                if config["temperature"]:
+                if config["temperature"] == 'True':
                     self.temp.append(TemperatureMeasure((self.idToName[message["id"]])))
                     self.temp[-1].dm = self.dm
                     serviceReq.append({"characteristic": "temperature",
                                        "interval": config["slow_polling_interval"]})
             elif p["characteristic"] == "ir_temperature":
-                if config["irtemperature"]:
+                if config["irtemperature"] == 'True':
                     self.irTemp.append(IrTemperatureMeasure(self.idToName[message["id"]]))
                     self.irTemp[-1].dm = self.dm
                     serviceReq.append({"characteristic": "ir_temperature",
                                        "interval": config["slow_polling_interval"]})
             elif p["characteristic"] == "acceleration":
-                if config["accel"]:
+                if config["accel"] == 'True':
                     self.accel.append(Accelerometer((self.idToName[message["id"]])))
                     serviceReq.append({"characteristic": "acceleration",
                                        "interval": config["accel_polling_interval"]})
                     self.accel[-1].dm = self.dm
             elif p["characteristic"] == "gyro":
-                if config["gyro"]:
+                if config["gyro"] == 'True':
                     self.gyro.append(Gyro(self.idToName[message["id"]]))
                     self.gyro[-1].dm = self.dm
                     serviceReq.append({"characteristic": "gyro",
                                        "interval": config["gyro_polling_interval"]})
             elif p["characteristic"] == "magnetometer":
-                if config["magnet"]: 
+                if config["magnet"] == 'True': 
                     self.magnet.append(Magnet(self.idToName[message["id"]]))
                     self.magnet[-1].dm = self.dm
                     serviceReq.append({"characteristic": "magnetometer",
                                        "interval": config["magnet_polling_interval"]})
             elif p["characteristic"] == "buttons":
-                if config["buttons"]:
+                if config["buttons"] == 'True':
                     self.buttons.append(Buttons(self.idToName[message["id"]]))
                     self.buttons[-1].dm = self.dm
                     serviceReq.append({"characteristic": "buttons",
                                        "interval": 0})
             elif p["characteristic"] == "humidity":
-                if config["humidity"]:
+                if config["humidity"] == 'True':
                     self.humidity.append(Humid(self.idToName[message["id"]]))
                     self.humidity[-1].dm = self.dm
                     serviceReq.append({"characteristic": "humidity",
                                        "interval": config["slow_polling_interval"]})
             elif p["characteristic"] == "binary_sensor":
-                if config["binary"]:
+                if config["binary"] == 'True':
                     self.binary.append(Binary(self.idToName[message["id"]]))
                     self.binary[-1].dm = self.dm
                     serviceReq.append({"characteristic": "binary_sensor",
                                        "interval": 0})
             elif p["characteristic"] == "power":
-                if config["power"]:
+                if config["power"] == 'True':
                     self.power.append(Power(self.idToName[message["id"]]))
                     self.power[-1].dm = self.dm
                     serviceReq.append({"characteristic": "power",
                                        "interval": 0})
             elif p["characteristic"] == "battery":
-                if config["battery"]:
+                if config["battery"] == 'True':
                     self.battery.append(Battery(self.idToName[message["id"]]))
                     self.battery[-1].dm = self.dm
                     serviceReq.append({"characteristic": "battery",
                                        "interval": 0})
             elif p["characteristic"] == "connected":
-                if config["connected"]:
+                if config["connected"] == 'True':
                     self.connected.append(Connected(self.idToName[message["id"]]))
                     self.connected[-1].dm = self.dm
                     serviceReq.append({"characteristic": "connected",
                                        "interval": 0})
             elif p["characteristic"] == "luminance":
-                if config["luminance"]:
+                if config["luminance"] == 'True':
                     self.luminance.append(Luminance(self.idToName[message["id"]]))
                     self.luminance[-1].dm = self.dm
                     serviceReq.append({"characteristic": "luminance",
