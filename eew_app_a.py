@@ -45,7 +45,8 @@ config = {
     'battery': 'True',
     'battery_min_change': 1.0,
     'connected': 'True',
-    'slow_polling_interval': 600.0
+    'slow_polling_interval': 600.0,
+    'send_delay': 10.0
 }
 
 class DataManager:
@@ -84,7 +85,7 @@ class DataManager:
         else:
             self.s[deviceID].append(values)
         if not deviceID in self.waiting:
-            reactor.callLater(SEND_DELAY, self.sendValues, deviceID)
+            reactor.callLater(config["send_delay"], self.sendValues, deviceID)
             self.waiting.append(deviceID)
 
     def storeAccel(self, deviceID, timeStamp, a):
@@ -376,8 +377,9 @@ class App(CbApp):
                 newConfig = json.load(configFile)
                 logging.info('%s Read eew_app.config', ModuleName)
                 config.update(newConfig)
-        except:
+        except Exception as ex:
             logging.warning('%s eew_app.config does not exist or file is corrupt', ModuleName)
+            logging.warning("%s Exception: %s %s", ModuleName, type(ex), str(ex.args))
         for c in config:
             if c.lower in ("true", "t", "1"):
                 config[c] = True
