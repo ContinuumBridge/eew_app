@@ -1,9 +1,9 @@
 {
     "exe": "eew_app.py", 
     "description": "EEW App", 
-    "url": "https://github.com/ContinuumBridge/eew_app/archive/v1.0.0.tar.gz", 
+    "url": "https://github.com/ContinuumBridge/eew_app/archive/v1.1.0.tar.gz", 
     "app_resource": "/api/bridge/v1/app/1/", 
-    "version": "1.0.0", 
+    "version": "1.1.0", 
     "provider": "ContinuumBridge", 
     "name": "EEW App"
 }

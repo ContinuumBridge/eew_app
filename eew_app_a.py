@@ -17,8 +17,6 @@ import requests
 import json
 from twisted.internet import reactor
 
-USER                     = "ea2f0e06ff8123b7f46f77a3a451731a"
-SEND_DELAY               = 20  # Time to gather values for a device before sending them
 # Default values:
 config = {
     'temperature': 'True',
@@ -46,7 +44,8 @@ config = {
     'battery_min_change': 1.0,
     'connected': 'True',
     'slow_polling_interval': 600.0,
-    'send_delay': 10.0
+    'send_delay': 3.0,
+    'geras_key': 'ea2f0e06ff8123b7f46f77a3a451731a'
 }
 
 class DataManager:
@@ -62,7 +61,7 @@ class DataManager:
         logging.debug("%s sendValues, device: %s length: %s", ModuleName, deviceID, str(len(values)))
         headers = {'Content-Type': 'application/json'}
         try:
-            r = requests.post(url, auth=(USER, ''), data=json.dumps({"e": values}), headers=headers)
+            r = requests.post(url, auth=(config["geras_key"], ''), data=json.dumps({"e": values}), headers=headers)
             status = r.status_code
             success = True
         except:
